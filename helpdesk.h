@@ -3,16 +3,17 @@
 
 #include <time.h>
 
-// Syllabus: Struct for a Linked List Node
 typedef struct Ticket {
-    int id;                 // Ticket ID
-    int uid;                // Student/User ID
-    char category[30];      // SCRUM-4: Hostel, Dept, General
-    char description[256];  // The issue details
-    char evidencePath[256]; // SCRUM-5: Path to the uploaded photo
-    char status[20];        // Open, Assigned, Closed
-    time_t timeCreated;
-    struct Ticket* next;    // Pointer to the next node (Linked List)
+    int id;
+    int uid;
+    char block[30];      // Added
+    char room[20];       // Added
+    char category[50];   // Expanded
+    char phone[15];      // Added
+    char description[512];
+    char evidencePath[256];
+    char status[20];
+    struct Ticket* next;
 } Ticket;
 
 // Syllabus: Struct for the Queue

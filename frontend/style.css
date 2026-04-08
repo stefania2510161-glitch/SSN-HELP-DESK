@@ -5,3 +5,7 @@ label { display: block; margin-top: 15px; font-weight: bold; }
 select, textarea, input { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
 button { width: 100%; background: #27ae60; color: white; padding: 12px; border: none; border-radius: 5px; margin-top: 20px; cursor: pointer; font-size: 16px; }
 button:hover { background: #219150; }
+.form-row { display: flex; gap: 15px; }
+.form-group { flex: 1; }
+.file-upload-box { border: 2px dashed #ccc; padding: 15px; border-radius: 5px; text-align: center; background: #fafafa; }
+.file-hint { font-size: 12px; color: #666; margin-top: 5px; }
