@@ -37,6 +37,25 @@ void viewHistory(TicketQueue* q, int studentID) {
     printf("\n---------------------------------------");
 }
 
+void displayAllTickets(TicketQueue* q) {
+    Ticket* temp = q->front; // Start at the beginning
+    
+    if (temp == NULL) {
+        printf("\n[Info] No active tickets in the system.\n");
+        return;
+    }
+
+    printf("\n--- SYSTEM TICKET REPORT ---");
+    while (temp != NULL) {
+        printf("\nID: %d | Category: %s | Status: %s", 
+                temp->id, temp->category, temp->status);
+        printf("\nDescription: %s", temp->description);
+        printf("\n----------------------------");
+        
+        temp = temp->next; // The "Link" part of Linked List
+    }
+}
+
 // SCRUM-9: Ticket Creation Logic (Enqueue)
 void enqueue(TicketQueue* q, int uid, char* cat, char* desc, char* file) {
     // 1. Dynamic Allocation (Syllabus: malloc)
