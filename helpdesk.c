@@ -1,3 +1,4 @@
+// Connected to Jira SCRUM-4
 #include "helpdesk.h"
 
 #include <limits.h>
