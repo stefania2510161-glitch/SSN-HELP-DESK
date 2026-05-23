@@ -86,18 +86,34 @@ def engineer_dashboard():
     if "user_id" not in session or session.get("role") != "engineer": return redirect(url_for("index"))
     return render_template("engineer-dashboard.html")
 
+def is_password_hashed(password):
+    return isinstance(password, str) and (
+        password.startswith("pbkdf2:") or password.startswith("bcrypt:") or password.startswith("scrypt:")
+    )
+
 def get_users():
     pf = os.path.join(BASE_DIR, "users.json")
     if os.path.exists(pf):
         try:
-            with open(pf, "r") as f: return json.load(f)
-        except: pass
+            with open(pf, "r") as f:
+                users = json.load(f)
+            migrated = False
+            for user_data in users.values():
+                pw = user_data.get("password", "")
+                if pw and not is_password_hashed(pw):
+                    user_data["password"] = generate_password_hash(pw)
+                    migrated = True
+            if migrated:
+                save_users(users)
+            return users
+        except Exception:
+            pass
     
     default_users = {
-        "user": {"user_id": 1, "password": "pass", "full_name": "Normal User", "role": "user"},
-        "admin": {"user_id": 2, "password": "pass", "full_name": "Administrator", "role": "admin"},
-        "middleman": {"user_id": 3, "password": "pass", "full_name": "Ticket Middleman", "role": "middleman"},
-        "ravi": {"user_id": 101, "password": "pass", "full_name": "Ravi Kumar", "role": "engineer"}
+        "user": {"user_id": 1, "password": generate_password_hash("pass"), "full_name": "Normal User", "role": "user"},
+        "admin": {"user_id": 2, "password": generate_password_hash("pass"), "full_name": "Administrator", "role": "admin"},
+        "middleman": {"user_id": 3, "password": generate_password_hash("pass"), "full_name": "Ticket Middleman", "role": "middleman"},
+        "ravi": {"user_id": 101, "password": generate_password_hash("pass"), "full_name": "Ravi Kumar", "role": "engineer"}
     }
     save_users(default_users)
     return default_users

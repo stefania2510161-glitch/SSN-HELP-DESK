@@ -78,9 +78,15 @@
     .btn-sm-assign:hover { background:#dce7ff; }
     .btn-sm-assign:disabled { opacity:.4; cursor:not-allowed; }
 
-    .filter-bar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+    .filter-bar { display:flex; flex-wrap:wrap; gap:.75rem; align-items:center; }
     .filter-bar select, .filter-bar input { border:1.5px solid var(--border); border-radius:7px; padding:.38rem .75rem; font-family:'DM Sans',sans-serif; font-size:.83rem; color:var(--text); background:#fff; }
     .filter-bar select:focus, .filter-bar input:focus { outline:none; border-color:var(--blue); }
+    .bst-search { display:flex; gap:.35rem; align-items:center; }
+    .bst-search input { min-width:120px; }
+    .bst-result { background:#fff; border:1px solid rgba(30,77,183,.14); border-radius:12px; padding:1rem 1.1rem; color:var(--text); font-size:.92rem; box-shadow:0 1px 8px rgba(0,0,0,.04); margin-top:.5rem; }
+    .sort-indicator { display:inline-block; width:1.05rem; text-align:right; margin-left:.25rem; color:var(--muted); }
+    .table-custom thead th[onclick] { cursor:pointer; }
+    .table-custom thead th[onclick]:hover { color:var(--blue); }
 
     .load-bar-wrap { display:flex; align-items:center; gap:.5rem; }
     .load-bar { height:6px; border-radius:99px; background:#e9ecef; flex:1; min-width:60px; overflow:hidden; }
@@ -269,7 +275,12 @@
               <option>Software</option><option>Furniture</option><option>Other</option>
             </select>
             <input type="text" id="filter-search" placeholder="Search…" oninput="applyFilters()" style="width:140px"/>
+            <div class="bst-search">
+              <input type="number" id="bst-search-id" placeholder="BST ticket ID" min="1" style="width:120px" />
+              <button type="button" class="btn-sm-assign" onclick="searchTicketBST()" style="padding:.35rem .8rem">Search BST</button>
+            </div>
           </div>
+          <div id="bst-search-result" class="bst-result" style="display:none; margin:1rem 1.5rem 0; font-size:.88rem;"></div>
         </div>
         <div id="all-tickets-loading" style="padding:2rem;text-align:center;color:var(--muted)">
           <span class="spinner-border spinner-border-sm me-2"></span>Loading tickets…
@@ -278,8 +289,15 @@
           <table class="table-custom">
             <thead>
             <tr>
-              <th>ID</th><th>User</th><th>Category</th><th>Status</th><th>Priority</th>
-              <th>Engineer</th><th>Description</th><th>Date</th><th>Actions</th>
+              <th onclick="setSort('id')">ID <span class="sort-indicator" id="sort-id"></span></th>
+              <th>User</th>
+              <th>Category</th>
+              <th onclick="setSort('status')">Status <span class="sort-indicator" id="sort-status"></span></th>
+              <th onclick="setSort('priority')">Priority <span class="sort-indicator" id="sort-priority"></span></th>
+              <th>Engineer</th>
+              <th>Description</th>
+              <th onclick="setSort('created_at')">Date <span class="sort-indicator" id="sort-created_at"></span></th>
+              <th>Actions</th>
             </tr>
             </thead>
             <tbody id="all-tickets-tbody"></tbody>
@@ -367,6 +385,8 @@
   let allTickets  = [];
   let allEngineers = [];
   let resChart    = null;
+  let sortKey     = 'id';
+  let sortAsc     = true;
   const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
   // ── Helpers ──────────────────────────────────────────────────────
@@ -512,6 +532,66 @@
     // ── Render all-tickets table ──────────────────────────────────────
     function applyFilters() { renderAllTickets(); }
 
+    function setSort(key) {
+      if (sortKey === key) {
+        sortAsc = !sortAsc;
+      } else {
+        sortKey = key;
+        sortAsc = true;
+      }
+      updateSortIndicators();
+      renderAllTickets();
+    }
+
+    function updateSortIndicators() {
+      ['id', 'status', 'priority', 'created_at'].forEach(k => {
+        const el = document.getElementById(`sort-${k}`);
+        if (!el) return;
+        el.textContent = sortKey === k ? (sortAsc ? '▲' : '▼') : '';
+      });
+    }
+
+    async function searchTicketBST() {
+      const ticketId = String(document.getElementById('bst-search-id').value).trim();
+      const resultEl = document.getElementById('bst-search-result');
+      resultEl.style.display = 'none';
+      if (!ticketId) {
+        resultEl.textContent = 'Enter a ticket ID to search the BST.';
+        resultEl.style.display = '';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/search_bst?ticket_id=${encodeURIComponent(ticketId)}`);
+        const data = await res.json();
+        if (!data.success) {
+          resultEl.textContent = data.error || 'Search failed.';
+          resultEl.style.display = '';
+          return;
+        }
+
+        const pathText = data.path && data.path.length ? data.path.join(' → ') : 'No path available';
+        let message = `BST search path: ${pathText}. `;
+        if (data.found) {
+          message += `Found ticket #${data.ticket.id} (${data.ticket.status}).`;
+          const row = document.getElementById(`row-${data.ticket.id}`);
+          if (row) {
+            row.style.transition = 'background .3s';
+            row.style.background = '#fff7d6';
+            setTimeout(() => { row.style.background = ''; }, 1800);
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        } else {
+          message += 'Ticket not found in BST.';
+        }
+        resultEl.textContent = message;
+        resultEl.style.display = '';
+      } catch (err) {
+        resultEl.textContent = 'Unable to search BST right now.';
+        resultEl.style.display = '';
+      }
+    }
+
     function renderAllTickets() {
       const fStatus = document.getElementById('filter-status').value;
       const fType   = document.getElementById('filter-type').value;
@@ -526,12 +606,24 @@
         return true;
       });
 
+      const sorted = filtered.slice().sort((a, b) => {
+        const order = sortAsc ? 1 : -1;
+        if (sortKey === 'id') return order * (a.id - b.id);
+        if (sortKey === 'priority') return order * ((a.priority || 0) - (b.priority || 0));
+        if (sortKey === 'created_at') return order * (new Date(a.created_at) - new Date(b.created_at));
+        if (sortKey === 'status') {
+          const statusOrder = { 'Open':1, 'Assigned':2, 'In Progress':3, 'Resolved':4, 'Closed':5 };
+          return order * ((statusOrder[a.status] || 99) - (statusOrder[b.status] || 99));
+        }
+        return 0;
+      });
+
       const tbody = document.getElementById('all-tickets-tbody');
-      if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><i class="bi bi-search"></i>No tickets match the filters.</div></td></tr>`;
+      if (!sorted.length) {
+        tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><i class="bi bi-search"></i>No tickets match the filters.</div></td></tr>`;
         return;
       }
-      tbody.innerHTML = filtered.map(t => {
+      tbody.innerHTML = sorted.map(t => {
         const engName = getEngName(t.engineer_id);
         const engCell = t.engineer_id
                 ? `<span class="eng-id">ENG-${t.engineer_id}</span>${engName ? `<div style="font-size:.73rem;color:var(--muted)">${engName}</div>` : ''}`
@@ -716,6 +808,7 @@
 
     // ── Init: load overview data immediately ──────────────────────────
     (async () => {
+      updateSortIndicators();
       await Promise.all([loadAllTickets(), loadEngineers()]);
     })();
 </script>
