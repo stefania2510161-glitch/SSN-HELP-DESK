@@ -83,6 +83,9 @@ static void printTicketJSON(const Ticket *ticket) {
     char safeDesc[MAX_DESCRIPTION_LEN * 2], safeNotes[MAX_NOTES_LEN * 2];
     char timeCreated[40], timeAssigned[40], timeClosed[40], engineerIdStr[16];
 
+    int issueIndex = (ticket->issueType >= 0 && ticket->issueType < (int)(sizeof(issueNames)/sizeof(issueNames[0]))) ? ticket->issueType : OTHER;
+    int statusIndex = (ticket->status >= 0 && ticket->status < (int)(sizeof(statusNames)/sizeof(statusNames[0]))) ? ticket->status : OPEN;
+
     jsonEscapeStr(safeDesc, ticket->description, sizeof(safeDesc));
     jsonEscapeStr(safeNotes, ticket->notes, sizeof(safeNotes));
     fmtTime(timeCreated, sizeof(timeCreated), ticket->timeCreated);
@@ -93,7 +96,7 @@ static void printTicketJSON(const Ticket *ticket) {
     else                 snprintf(engineerIdStr, sizeof(engineerIdStr), "%d", ticket->eid);
 
     printf("{\"id\":%d,\"user_id\":%d,\"engineer_id\":%s,\"issue_type\":\"%s\",\"status\":\"%s\",\"description\":\"%s\",\"notes\":\"%s\",\"created_at\":%s,\"assigned_at\":%s,\"closed_at\":%s,\"priority\":%d}",
-           ticket->id, ticket->uid, engineerIdStr, issueNames[ticket->issueType], statusNames[ticket->status],
+           ticket->id, ticket->uid, engineerIdStr, issueNames[issueIndex], statusNames[statusIndex],
            safeDesc, safeNotes, timeCreated, timeAssigned, timeClosed, ticket->priority);
 }
 
@@ -119,13 +122,20 @@ static void loadTickets(void) {
     FILE *file = fopen("tickets.db", "rb");
     if (!file) return;
     int savedTicketCount = 0;
-    fread(&savedTicketCount, sizeof(int), 1, file);
+    if (fread(&savedTicketCount, sizeof(int), 1, file) != 1 || savedTicketCount < 0 || savedTicketCount > MAX_TICKETS_HEAP) {
+        fclose(file);
+        return;
+    }
     for (int i = 0; i < savedTicketCount; i++) {
         Ticket tempTicket;
-        if (fread(&tempTicket, sizeof(Ticket), 1, file) == 1) {
-            ticketBSTRoot = insertTicketIntoBST(ticketBSTRoot, tempTicket);
-            ticketCount++;
-        }
+        if (fread(&tempTicket, sizeof(Ticket), 1, file) != 1) break;
+        tempTicket.description[MAX_DESCRIPTION_LEN - 1] = '\0';
+        tempTicket.notes[MAX_NOTES_LEN - 1] = '\0';
+        tempTicket.imagePath[255] = '\0';
+        if (tempTicket.issueType < 0 || tempTicket.issueType >= (int)(sizeof(issueNames)/sizeof(issueNames[0]))) tempTicket.issueType = OTHER;
+        if (tempTicket.status < 0 || tempTicket.status >= (int)(sizeof(statusNames)/sizeof(statusNames[0]))) tempTicket.status = OPEN;
+        ticketBSTRoot = insertTicketIntoBST(ticketBSTRoot, tempTicket);
+        ticketCount++;
     }
     fclose(file);
 }
@@ -149,9 +159,14 @@ int syncTickets(void) {
 static void loadEngineers(void) {
     FILE *f = fopen("engineers.db", "rb");
     if (!f) return;
-    fread(&engineerCount, sizeof(int), 1, f);
-    if (engineerCount < 0 || engineerCount > MAX_ENGINEERS) engineerCount = 0;
-    fread(engineers, sizeof(Engineer), engineerCount, f);
+    if (fread(&engineerCount, sizeof(int), 1, f) != 1 || engineerCount < 0 || engineerCount > MAX_ENGINEERS) {
+        engineerCount = 0;
+        fclose(f);
+        return;
+    }
+    if (fread(engineers, sizeof(Engineer), engineerCount, f) != (size_t)engineerCount) {
+        engineerCount = 0;
+    }
     fclose(f);
 }
 
@@ -305,13 +320,14 @@ Ticket *createTicket(int uid, const char *issueType, const char *description, in
     newTicket.timeCreated = time(NULL);
     newTicket.timeAssigned = 0;
     newTicket.timeClosed = 0;
+    strncpy(newTicket.description, description, MAX_DESCRIPTION_LEN - 1);
+    newTicket.description[MAX_DESCRIPTION_LEN - 1] = '\0';
+
     strncpy(newTicket.notes, notes, MAX_NOTES_LEN - 1); // Set the smart notes
     newTicket.notes[MAX_NOTES_LEN - 1] = '\0';
     strncpy(newTicket.imagePath, imagePath, 255);
     newTicket.imagePath[255] = '\0';
 
-    strncpy(newTicket.description, description, MAX_DESCRIPTION_LEN - 1);
-    newTicket.description[MAX_DESCRIPTION_LEN - 1] = '\0';
     ticketBSTRoot = insertTicketIntoBST(ticketBSTRoot, newTicket);
     ticketCount++;
     syncTickets();
