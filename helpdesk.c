@@ -255,13 +255,77 @@ static void initUsersDefault(void) {
 }
 
 static void initEngineersDefault(void) {
-    engineers[0] = (Engineer){101, "Ravi Kumar",   WIFI,      0, 0};
-    engineers[1] = (Engineer){102, "Priya Sharma", HARDWARE,  0, 0};
-    engineers[2] = (Engineer){103, "Karthik N",    FURNITURE, 0, 0};
-    engineers[3] = (Engineer){104, "Meena Iyer",   SOFTWARE,  0, 0};
-    engineers[4] = (Engineer){105, "Arjun Das",    NETWORK,   0, 0};
-    engineerCount = 5;
+    engineers[0] = (Engineer){101, "Ravi Kumar", WIFI, 0, 0};
+    engineerCount = 1;
     syncEngineers();
+}
+
+static void resetSingleEngineerState(void) {
+    engineers[0] = (Engineer){101, "Ravi Kumar", WIFI, 0, 0};
+    engineerCount = 1;
+    syncEngineers();
+}
+
+static void recalcEngineersFromTickets(void) {
+    engineers[0].ticketsAssigned = 0;
+    engineers[0].ticketsResolved = 0;
+
+    struct TicketNode* current = ticketBSTRoot;
+    int stackSize = 0;
+    TicketNode* stack[MAX_TICKETS_HEAP];
+
+    while (current != NULL || stackSize > 0) {
+        while (current != NULL) {
+            stack[stackSize++] = current;
+            current = current->leftChild;
+        }
+        current = stack[--stackSize];
+
+        if (current->data.eid == engineers[0].id) {
+            if (current->data.status == CLOSED || current->data.status == RESOLVED) {
+                engineers[0].ticketsResolved++;
+            } else {
+                engineers[0].ticketsAssigned++;
+            }
+        }
+
+        current = current->rightChild;
+    }
+
+    syncEngineers();
+}
+
+static void normalizeTicketsToSingleEngineer(void) {
+    struct TicketNode* current = ticketBSTRoot;
+    int stackSize = 0;
+    TicketNode* stack[MAX_TICKETS_HEAP];
+
+    while (current != NULL || stackSize > 0) {
+        while (current != NULL) {
+            stack[stackSize++] = current;
+            current = current->leftChild;
+        }
+        current = stack[--stackSize];
+
+        current->data.eid = engineers[0].id;
+        if (current->data.status == OPEN) {
+            current->data.status = ASSIGNED;
+            current->data.timeAssigned = time(NULL);
+        }
+
+        current = current->rightChild;
+    }
+
+    syncTickets();
+    recalcEngineersFromTickets();
+}
+
+static void normalizeEngineersAndAssignments(void) {
+    if (engineerCount != 1 || engineers[0].id != 101 || strcmp(engineers[0].name, "Ravi Kumar") != 0) {
+        resetSingleEngineerState();
+    }
+
+    normalizeTicketsToSingleEngineer();
 }
 
 int authenticateUser(char *username, char *password) {
@@ -651,6 +715,7 @@ int main(int argc, char *argv[]) {
     loadEngineers();
     if (engineerCount == 0) initEngineersDefault();
     loadTickets();
+    normalizeEngineersAndAssignments();
 
     if (argc == 1) return 0;
 

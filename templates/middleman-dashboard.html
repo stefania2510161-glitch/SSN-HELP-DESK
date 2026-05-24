@@ -343,13 +343,12 @@
     
     tbody.innerHTML = filtered.map(t => {
       const isDone = ['Resolved','Closed'].includes(t.status);
-      
-      const specialists = allEngineers.filter(e => e.specialty === t.issue_type);
-      const engOptions = specialists.length > 0 
-        ? specialists.map(e => 
-            `<option value="${e.id}" ${t.engineer_id === e.id ? 'selected' : ''}>${e.name}</option>`
+
+      const engOptions = allEngineers.length > 0
+        ? allEngineers.map(e =>
+            `<option value="${e.id}" ${t.engineer_id === e.id ? 'selected' : ''}>${e.name} (${e.specialty})</option>`
           ).join('')
-        : `<option disabled selected>No ${t.issue_type} Specialists Found</option>`;
+        : `<option disabled selected>No engineers available</option>`;
       const imgLink = t.image_path && t.image_path !== 'null'
         ? `<div class="mt-1"><a href="/${t.image_path}" target="_blank" class="text-decoration-none x-small" style="font-size: 0.7rem;"><i class="bi bi-image"></i> Image</a></div>`
         : '';
@@ -399,7 +398,7 @@
     const data = await res.json();
     if (data.success) {
         showToast(`Ticket #${tid} assigned to Engineer ${eid}`, 'success');
-        loadAllTickets();
+        await loadAllTickets();
     }
   }
   async function doSetPriority(ticketId) {
