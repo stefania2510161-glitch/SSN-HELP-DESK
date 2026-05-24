@@ -1,73 +1,39 @@
-SSN HelpDesk: Hybrid Systems Implementation
+# SSN Help Desk System
 
-A high-performance ticketing management system designed for Shiv Nadar - SSN Institutions. This project demonstrates a Hybrid Architecture, utilizing C for low-level memory management and data structures, and Python (Flask) for a modern, responsive web interface.
-🚀 The Core Innovation: Priority Queueing
+A hybrid Help Desk Management System featuring a high-performance **C Backend** for data structures and a **Python/Flask Frontend** for the web interface.
 
-Unlike standard helpdesks that use simple FIFO (First-In-First-Out) logic, this system implements a Priority Queue using a Sorted Linked List in C. This ensures that critical infrastructure issues (like network outages) are automatically escalated to the top of the queue.
-🛠️ Tech Stack
+## Architecture
+- **Backend (C)**: Utilizes a Binary Search Tree (BST) for $O(\log n)$ ticket lookups and a Min-Heap for priority-based sorting.
+- **Frontend (Python/Flask)**: Handles user authentication, session management, and a "Smart Analysis" engine that automatically categorizes ticket urgency.
 
-    Backend Engine: C (C11) – Handles logic, sorting, and binary file persistence.
+## Features
+- **Smart Dispatcher**: Automatically identifies high-priority keywords (fire, server, leak) and assigns tickets to specialized engineers.
+- **Binary Search Tree Explorer**: Backend-driven ticket retrieval.
+- **Image Support**: Users can upload images of issues, which are compressed via Pillow to save server space.
+- **Security**: Implements CSRF protection via Flask-WTF and password hashing with Werkzeug.
 
-    Middleware: Python 3.12 + Flask – Serves as the API bridge and orchestrator.
+## Prerequisites
+- **C Compiler**: `gcc` (MinGW for Windows).
+- **Python**: 3.8 or higher.
+- **Dependencies**:
+  ```bash
+  pip install -r requirements.txt
+  ```
 
-    Frontend: HTML5, CSS3 (Bootstrap 5.3), JavaScript (ES6).
+## Setup and Execution
 
-    Database: Binary File I/O (.db files) – Fast, low-overhead data storage.
+1. **Compile the C Backend**:
+   ```bash
+   gcc -o helpdesk helpdesk.c
+   ```
 
-🏗️ System Architecture
+2. **Initialize Uploads Directory**:
+   ```bash
+   mkdir static/uploads
+   ```
 
-The application utilizes a Subprocess Bridge to communicate between the high-level web server and the low-level logic engine:
-
-    Frontend: Collects user data and sends a JSON request via fetch().
-
-    Flask (Python): Validates the session and invokes the compiled C binary.
-
-    C Engine: Executes the requested operation (Create, List, Sort) and outputs a JSON string to STDOUT.
-
-    Flask: Captures the output and relays the JSON back to the user.
-
-📋 Features
-
-    Role-Based Access Control: Distinct dashboards for Students (Users) and Service Engineers (Admins).
-
-    Persistent Storage: Data is saved in a binary format to ensure it survives server restarts.
-
-    Dynamic Sorting: High-priority tickets (Level 5) are visually and logically prioritized over low-priority ones.
-
-    Responsive UI: Designed specifically with the SSN branding and professional DM Sans typography.
-
-⚙️ Setup & Installation
-1. Prerequisites
-
-    GCC Compiler (MinGW for Windows)
-
-    Python 3.10+
-
-    VS Code (Recommended)
-
-2. Compilation (The C Engine)
-
-First, compile the core logic engine into an executable:
-PowerShell
-
-gcc helpdesk.c -o helpdesk.exe
-
-3. Environment Setup
-
-Create a virtual environment and install dependencies:
-PowerShell
-
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install flask
-
-4. Run the Application
-PowerShell
-
-python app.py
-
-Access the portal at http://127.0.0.1:5000
-🧠 Data Structure Details
-
-
-    Communication Protocol: Standardized JSON exchange between C and Python.
+3. **Run the Flask App**:
+   ```bash
+   python app.py
+   ```
+   Access the dashboard at `http://127.0.0.1:5000`.

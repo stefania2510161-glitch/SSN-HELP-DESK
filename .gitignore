@@ -1,0 +1,30 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE/editor files
+*.swp
+*.swo
+*.idea/
+.vscode/
+
+# Executables
+*.exe
+
+# Local databases and logs
+*.db
+*.dat
+*.log
+undo_history.json
+
+# User uploads
+static/uploads/
+
+

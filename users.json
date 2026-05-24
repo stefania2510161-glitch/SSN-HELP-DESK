@@ -1,0 +1,38 @@
+{
+  "user": {
+    "user_id": 1,
+    "password": "scrypt:32768:8:1$UBPciI1KCGSkJ5q5$92f4a2abc6b599c0db5ba5f3e1eeba89ef8ccdd65598839fd8f4f379f6456c533c5e777d2bbf30a05b17afe1fe507347b687c247b1a494336d64231a7b982320",
+    "full_name": "Normal User",
+    "role": "user"
+  },
+  "admin": {
+    "user_id": 2,
+    "password": "scrypt:32768:8:1$fK4vNV8MpI4uGxSe$63663476a28c73b8ac5f4f984b6cf695f61c0b2a0a0c13111d8d83831c6b34d0b2d23c2b46a9f0dcb9f87254eacfb4cf48fd7b9f4d0d2a06b38ef9e79d5ddbe3",
+    "full_name": "Administrator",
+    "role": "admin"
+  },
+  "middleman": {
+    "user_id": 3,
+    "password": "scrypt:32768:8:1$YItra2p4gXZmFaI2$8fa0a80b57f4ab4ab09620b6aec3fd75d2a8a691228f7c0772bdd0ef0f7ce048f9c577f7741208d6a324a3c3946217c83bf5b5d49da947eb75b976f168ed66f9",
+    "full_name": "Ticket Middleman",
+    "role": "middleman"
+  },
+  "newuser": {
+    "user_id": 4,
+    "password": "scrypt:32768:8:1$7yEYn0614wT0T6hs$b7d87415e5ebbee2987eb0df7a6a477782ce0a795b223045958beba5d97f63e160c8acdcc5ac7e5209ed119a83e498bd8fdaf8dd937e8286f6b78dcbcda99677",
+    "full_name": "New User",
+    "role": "user"
+  },
+  "Johnny": {
+    "user_id": 5,
+    "password": "scrypt:32768:8:1$an4XpojxlxDOZcKq$918e801e2b8f133f4d7e03bc2423795a5b1de1c26a839fc2d534f47a31e4a5935aa5e018970237a8f0ff4d3d389243be2d0859e2e7189a353b82f60c8d8f08cc",
+    "full_name": "John Doe",
+    "role": "user"
+  },
+  "ravi": {
+    "user_id": 101,
+    "password": "scrypt:32768:8:1$bIY0U5O9YWN187pR$7f5591706e8e43276433e6767e50bb59bf42778f6ed714358c00d264bb004c6318e1fb6f95c6a52a3a0e8c435724f707585d32d2e1eb41a97258f98d7b524f37",
+    "full_name": "Ravi Kumar",
+    "role": "engineer"
+  }
+}
