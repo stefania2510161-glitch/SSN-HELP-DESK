@@ -27,6 +27,13 @@ TicketNode* createNewTicketNode(Ticket newTicket) {
     return newNode;
 }
 
+void freeBST(TicketNode* root) {
+    if (root == NULL) return;
+    freeBST(root->leftChild);
+    freeBST(root->rightChild);
+    free(root);
+}
+
 TicketNode* insertTicketIntoBST(TicketNode* root, Ticket newTicket) {
     if (root == NULL) return createNewTicketNode(newTicket);
     if (newTicket.id < root->data.id) root->leftChild = insertTicketIntoBST(root->leftChild, newTicket);
