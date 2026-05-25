@@ -398,6 +398,9 @@ Ticket *createTicket(int uid, const char *issueType, const char *description, in
     syncEngineers();
 
     TicketNode* insertedNode = searchTicketInBST(ticketBSTRoot, newTicket.id);
+    if (insertedNode != NULL) {
+        pushUndo(uid, newTicket.id, "create_ticket", insertedNode->data);
+    }
     return &(insertedNode->data);
 }
 
@@ -494,16 +497,20 @@ static void cmdCreateTicket(int argc, char *argv[]) {
 
 static void cmdCloseTicket(int argc, char *argv[]) {
     if (argc < 3) {
-        printf("{\"success\":false,\"error\":\"Usage: close_ticket <ticket_id>\"}\n");
+        printf("{\"success\":false,\"error\":\"Usage: close_ticket <ticket_id> [user_id]\"}\n");
         exit(1);
     }
     int tid = atoi(argv[2]);
+    int closedByUid = (argc >= 4) ? atoi(argv[3]) : 0;
     TicketNode* targetNode = searchTicketInBST(ticketBSTRoot, tid);
     if (targetNode != NULL) {
         if (targetNode->data.status == CLOSED) {
             printf("{\"success\":false,\"error\":\"Ticket already closed\"}\n");
             exit(1);
         }
+        
+        pushUndo(closedByUid, targetNode->data.id, "close_ticket", targetNode->data);
+
         closeTicket(&(targetNode->data));
         printf("{\"success\":true,\"message\":\"Ticket #%d closed\",\"ticket\":", tid);
         printTicketJSON(&(targetNode->data));
@@ -710,6 +717,202 @@ static void cmdListEngineers(void) {
     exit(0);
 }
 
+void loadUndoStack(UndoStack *stack) {
+    stack->count = 0;
+    FILE *f = fopen("undo_stack.dat", "rb");
+    if (!f) return;
+    int readCount = 0;
+    if (fread(&readCount, sizeof(int), 1, f) == 1) {
+        if (readCount >= 0 && readCount <= MAX_UNDO_RECORDS) {
+            stack->count = readCount;
+            fread(stack->records, sizeof(UndoRecord), readCount, f);
+        }
+    }
+    fclose(f);
+}
+
+void saveUndoStack(const UndoStack *stack) {
+    FILE *f = fopen("undo_stack.dat", "wb");
+    if (!f) return;
+    fwrite(&(stack->count), sizeof(int), 1, f);
+    fwrite(stack->records, sizeof(UndoRecord), stack->count, f);
+    fclose(f);
+}
+
+void pushUndo(int userId, int ticketId, const char *action, Ticket ticketState) {
+    UndoStack stack;
+    loadUndoStack(&stack);
+    
+    if (stack.count >= MAX_UNDO_RECORDS) {
+        for (int i = 1; i < MAX_UNDO_RECORDS; i++) {
+            stack.records[i - 1] = stack.records[i];
+        }
+        stack.count = MAX_UNDO_RECORDS - 1;
+    }
+    
+    UndoRecord *r = &stack.records[stack.count++];
+    r->userId = userId;
+    r->ticketId = ticketId;
+    strncpy(r->action, action, sizeof(r->action) - 1);
+    r->action[sizeof(r->action) - 1] = '\0';
+    r->timestamp = time(NULL);
+    r->ticketState = ticketState;
+    
+    saveUndoStack(&stack);
+}
+
+int popUndoForUser(int userId, UndoRecord *result) {
+    UndoStack stack;
+    loadUndoStack(&stack);
+    
+    int foundIndex = -1;
+    for (int i = stack.count - 1; i >= 0; i--) {
+        if (stack.records[i].userId == userId) {
+            foundIndex = i;
+            break;
+        }
+    }
+    
+    if (foundIndex == -1) return 0;
+    
+    *result = stack.records[foundIndex];
+    
+    for (int j = foundIndex; j < stack.count - 1; j++) {
+        stack.records[j] = stack.records[j + 1];
+    }
+    stack.count--;
+    
+    saveUndoStack(&stack);
+    return 1;
+}
+
+int getLatestUndoForUser(int userId, UndoRecord *result) {
+    UndoStack stack;
+    loadUndoStack(&stack);
+    
+    for (int i = stack.count - 1; i >= 0; i--) {
+        if (stack.records[i].userId == userId) {
+            *result = stack.records[i];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void collectTicketsExcept(TicketNode* root, int targetId, Ticket* tempArray, int* count) {
+    if (root == NULL) return;
+    collectTicketsExcept(root->leftChild, targetId, tempArray, count);
+    if (root->data.id != targetId) {
+        tempArray[(*count)++] = root->data;
+    }
+    collectTicketsExcept(root->rightChild, targetId, tempArray, count);
+}
+
+void freeBST(TicketNode* root) {
+    if (root == NULL) return;
+    freeBST(root->leftChild);
+    freeBST(root->rightChild);
+    free(root);
+}
+
+void deleteTicket(int targetId) {
+    Ticket* tempArray = (Ticket*)malloc(sizeof(Ticket) * (ticketCount + 1));
+    int newCount = 0;
+    collectTicketsExcept(ticketBSTRoot, targetId, tempArray, &newCount);
+    
+    freeBST(ticketBSTRoot);
+    ticketBSTRoot = NULL;
+    ticketCount = 0;
+    
+    for (int i = 0; i < newCount; i++) {
+        ticketBSTRoot = insertTicketIntoBST(ticketBSTRoot, tempArray[i]);
+        ticketCount++;
+    }
+    free(tempArray);
+}
+
+static void cmdUndo(int argc, char *argv[]) {
+    if (argc < 3) {
+        printf("{\"success\":false,\"error\":\"Usage: undo <user_id>\"}\n");
+        exit(1);
+    }
+    int uid = atoi(argv[2]);
+    UndoRecord r;
+    if (!popUndoForUser(uid, &r)) {
+        printf("{\"success\":false,\"error\":\"No actions to undo\"}\n");
+        exit(1);
+    }
+    
+    time_t now = time(NULL);
+    if (now - r.timestamp > 300) {
+        printf("{\"success\":false,\"error\":\"Undo window has expired (5-minute limit)\"}\n");
+        exit(1);
+    }
+    
+    if (strcmp(r.action, "create_ticket") == 0) {
+        TicketNode* node = searchTicketInBST(ticketBSTRoot, r.ticketId);
+        if (node != NULL) {
+            int eid = node->data.eid;
+            if (eid > 0) {
+                for (int i = 0; i < engineerCount; i++) {
+                    if (engineers[i].id == eid) {
+                        if (engineers[i].ticketsAssigned > 0) engineers[i].ticketsAssigned--;
+                        break;
+                    }
+                }
+            }
+            deleteTicket(r.ticketId);
+        }
+        syncTickets();
+        syncEngineers();
+        printf("{\"success\":true,\"message\":\"Creation of Ticket #%d has been undone\"}\n", r.ticketId);
+        exit(0);
+    } 
+    else if (strcmp(r.action, "close_ticket") == 0) {
+        TicketNode* node = searchTicketInBST(ticketBSTRoot, r.ticketId);
+        if (node != NULL) {
+            int eid = node->data.eid;
+            if (eid > 0) {
+                for (int i = 0; i < engineerCount; i++) {
+                    if (engineers[i].id == eid) {
+                        if (engineers[i].ticketsResolved > 0) engineers[i].ticketsResolved--;
+                        engineers[i].ticketsAssigned++;
+                        break;
+                    }
+                }
+            }
+            node->data = r.ticketState;
+        }
+        syncTickets();
+        syncEngineers();
+        printf("{\"success\":true,\"message\":\"Closure of Ticket #%d has been undone\"}\n", r.ticketId);
+        exit(0);
+    }
+    else {
+        printf("{\"success\":false,\"error\":\"Unknown action inside undo record\"}\n");
+        exit(1);
+    }
+}
+
+static void cmdUndoStatus(int argc, char *argv[]) {
+    if (argc < 3) {
+        printf("{\"success\":false,\"error\":\"Usage: undo_status <user_id>\"}\n");
+        exit(1);
+    }
+    int uid = atoi(argv[2]);
+    UndoRecord r;
+    if (!getLatestUndoForUser(uid, &r)) {
+        printf("{\"success\":true,\"has_undo\":false}\n");
+        exit(0);
+    }
+    
+    time_t now = time(NULL);
+    int is_valid = (now - r.timestamp) <= 300;
+    printf("{\"success\":true,\"has_undo\":%s,\"last_action\":\"%s\",\"ticket_id\":%d}\n",
+           is_valid ? "true" : "false", r.action, r.ticketId);
+    exit(0);
+}
+
 int main(int argc, char *argv[]) {
     initUsersDefault();
     loadEngineers();
@@ -733,6 +936,8 @@ int main(int argc, char *argv[]) {
     else if (strcmp(cmd, "search_bst")     == 0) cmdSearchBST(argc, argv);
     else if (strcmp(cmd, "list_tickets_admin") == 0) cmdListTicketsAdmin();
     else if (strcmp(cmd, "list_engineers") == 0) cmdListEngineers();
+    else if (strcmp(cmd, "undo")           == 0) cmdUndo(argc, argv);
+    else if (strcmp(cmd, "undo_status")    == 0) cmdUndoStatus(argc, argv);
     else {
         printf("{\"success\":false,\"error\":\"Unknown command\"}\n");
         return 1;

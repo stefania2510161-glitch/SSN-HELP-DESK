@@ -11,50 +11,6 @@ from helpdesk_client import PROBLEM_DB, apply_priorities, run_helpdesk
 
 ticket_bp = Blueprint("ticket", __name__)
 
-UNDO_HISTORY_FILE = "undo_history.json"
-
-def push_undo_action(user_id, action, ticket_id):
-    history = {}
-    if os.path.exists(UNDO_HISTORY_FILE):
-        try:
-            with open(UNDO_HISTORY_FILE, "r") as f:
-                history = json.load(f)
-        except Exception:
-            pass
-    u_str = str(user_id)
-    if u_str not in history:
-        history[u_str] = []
-    history[u_str].append({
-        "action": action,
-        "ticket_id": int(ticket_id),
-        "timestamp": time.time()
-    })
-    history[u_str] = history[u_str][-10:]
-    try:
-        with open(UNDO_HISTORY_FILE, "w") as f:
-            json.dump(history, f, indent=2)
-    except Exception as e:
-        print(f"Error saving undo history: {e}")
-
-def pop_undo_action(user_id):
-    if not os.path.exists(UNDO_HISTORY_FILE):
-        return None
-    try:
-        with open(UNDO_HISTORY_FILE, "r") as f:
-            history = json.load(f)
-    except Exception:
-        return None
-    u_str = str(user_id)
-    if u_str not in history or not history[u_str]:
-        return None
-    action_item = history[u_str].pop()
-    try:
-        with open(UNDO_HISTORY_FILE, "w") as f:
-            json.dump(history, f, indent=2)
-    except Exception as e:
-        print(f"Error updating undo history: {e}")
-    return action_item
-
 
 @ticket_bp.route("/api/tickets", methods=["GET"])
 @login_required()
@@ -147,10 +103,6 @@ def api_create_ticket():
 
     ticket_id = res["ticket"]["id"]
     assign_res = run_helpdesk("auto_assign_ticket", ticket_id)
-    
-    # Push to undo history stack
-    push_undo_action(session["user_id"], "create_ticket", ticket_id)
-    
     return jsonify({"success": True, "ticket": assign_res.get("ticket", res["ticket"]), "inferred_note": brief_note}), 200
 
 
@@ -178,9 +130,7 @@ def api_delete_ticket():
 def api_close_ticket():
     data = request.get_json(silent=True) or {}
     ticket_id = int(data.get("ticket_id", 0))
-    result = run_helpdesk("close_ticket", ticket_id)
-    if result.get("success"):
-        push_undo_action(session["user_id"], "close_ticket", ticket_id)
+    result = run_helpdesk("close_ticket", ticket_id, session["user_id"])
     return jsonify(result), 200 if result.get("success") else 400
 
 
@@ -224,54 +174,13 @@ def api_get_engineers():
 @login_required()
 def api_undo():
     user_id = session.get("user_id")
-    action_item = pop_undo_action(user_id)
-    if not action_item:
-        return jsonify({"success": False, "error": "No actions to undo"}), 400
-        
-    time_limit = 300
-    if time.time() - action_item["timestamp"] > time_limit:
-        return jsonify({"success": False, "error": "Undo window has expired (5-minute limit)"}), 400
-        
-    ticket_id = action_item["ticket_id"]
-    action = action_item["action"]
-    
-    try:
-        import db_helper
-        if action == "create_ticket":
-            db_helper.delete_ticket_bst(ticket_id)
-            return jsonify({"success": True, "message": f"Creation of Ticket #{ticket_id} has been undone"}), 200
-        elif action == "close_ticket":
-            db_helper.reopen_ticket(ticket_id)
-            return jsonify({"success": True, "message": f"Closure of Ticket #{ticket_id} has been undone"}), 200
-        else:
-            return jsonify({"success": False, "error": f"Unknown undo action: {action}"}), 400
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+    result = run_helpdesk("undo", user_id)
+    return jsonify(result), 200 if result.get("success") else 400
 
 
 @ticket_bp.route("/api/undo/status", methods=["GET"])
 @login_required()
 def api_undo_status():
     user_id = session.get("user_id")
-    if not os.path.exists(UNDO_HISTORY_FILE):
-        return jsonify({"success": True, "has_undo": False}), 200
-    try:
-        with open(UNDO_HISTORY_FILE, "r") as f:
-            history = json.load(f)
-    except Exception:
-        return jsonify({"success": True, "has_undo": False}), 200
-        
-    u_str = str(user_id)
-    if u_str not in history or not history[u_str]:
-        return jsonify({"success": True, "has_undo": False}), 200
-        
-    last_item = history[u_str][-1]
-    time_limit = 300
-    is_valid = (time.time() - last_item["timestamp"]) <= time_limit
-    
-    return jsonify({
-        "success": True,
-        "has_undo": is_valid,
-        "last_action": last_item["action"],
-        "ticket_id": last_item["ticket_id"]
-    }), 200
+    result = run_helpdesk("undo_status", user_id)
+    return jsonify(result), 200 if result.get("success") else 500

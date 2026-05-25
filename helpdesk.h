@@ -55,4 +55,26 @@ typedef struct TicketNode {
     struct TicketNode* rightChild;
 } TicketNode;
 
+typedef struct {
+    int userId;
+    int ticketId;
+    char action[32]; // "create_ticket", "close_ticket"
+    time_t timestamp;
+    Ticket ticketState; // Reusable: stores state to restore (e.g. for close_ticket)
+} UndoRecord;
+
+#define MAX_UNDO_RECORDS 100
+
+typedef struct {
+    UndoRecord records[MAX_UNDO_RECORDS];
+    int count;
+} UndoStack;
+
+void loadUndoStack(UndoStack *stack);
+void saveUndoStack(const UndoStack *stack);
+void pushUndo(int userId, int ticketId, const char *action, Ticket ticketState);
+int popUndoForUser(int userId, UndoRecord *result);
+int getLatestUndoForUser(int userId, UndoRecord *result);
+void deleteTicket(int targetId);
+
 #endif /* HELPDESK_H */
