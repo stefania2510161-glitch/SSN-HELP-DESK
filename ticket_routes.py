@@ -123,6 +123,17 @@ def api_delete_ticket():
     return jsonify(result), 200 if result.get("success") else 400
 
 
+@ticket_bp.route("/api/undo_ticket", methods=["POST"])
+@login_required()
+def api_undo_ticket():
+    data = request.get_json(silent=True) or {}
+    ticket_id = data.get("ticket_id")
+    if not ticket_id:
+        return jsonify({"success": False, "error": "Missing ticket_id"}), 400
+    result = run_helpdesk("undo_ticket", session["user_id"], ticket_id)
+    return jsonify(result), 200 if result.get("success") else 400
+
+
 @ticket_bp.route("/api/close_ticket", methods=["POST"])
 @login_required()
 def api_close_ticket():

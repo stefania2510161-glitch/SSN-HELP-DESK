@@ -29,6 +29,34 @@ TicketNode* insertTicketIntoBST(TicketNode* root, Ticket newTicket) {
     return root;
 }
 
+static TicketNode* findMin(TicketNode* node) {
+    while (node->leftChild != NULL) node = node->leftChild;
+    return node;
+}
+
+TicketNode* removeTicketFromBST(TicketNode* root, int targetId) {
+    if (root == NULL) return NULL;
+    if (targetId < root->data.id) {
+        root->leftChild = removeTicketFromBST(root->leftChild, targetId);
+    } else if (targetId > root->data.id) {
+        root->rightChild = removeTicketFromBST(root->rightChild, targetId);
+    } else {
+        if (root->leftChild == NULL) {
+            TicketNode* temp = root->rightChild;
+            free(root);
+            return temp;
+        } else if (root->rightChild == NULL) {
+            TicketNode* temp = root->leftChild;
+            free(root);
+            return temp;
+        }
+        TicketNode* temp = findMin(root->rightChild);
+        root->data = temp->data;
+        root->rightChild = removeTicketFromBST(root->rightChild, temp->data.id);
+    }
+    return root;
+}
+
 TicketNode* searchTicketInBST(TicketNode* root, int targetId) {
     if (root == NULL || root->data.id == targetId) return root;
     if (targetId < root->data.id) return searchTicketInBST(root->leftChild, targetId);

@@ -207,6 +207,26 @@ static int cmdDeleteTicket(int argc, char* argv[]) {
     return 1;
 }
 
+static int cmdUndoTicket(int argc, char* argv[]) {
+    if (argc < 4) {
+        printf("{\"success\":false,\"error\":\"Usage: undo_ticket <uid> <tid>\"}\n");
+        return 1;
+    }
+
+    int uid = atoi(argv[2]);
+    int tid = atoi(argv[3]);
+    TicketNode* node = searchTicketInBST(ticketBSTRoot, tid);
+    if (node && node->data.uid == uid && node->data.status != CLOSED && node->data.status != RESOLVED) {
+        printf("{\"success\":true,\"ticket\":");
+        printTicketJSON(&(node->data));
+        printf("}\n");
+        hardDeleteTicket(uid, tid);
+        return 0;
+    }
+    printf("{\"success\":false,\"error\":\"Ticket not found or ineligible for undo\"}\n");
+    return 1;
+}
+
 static int cmdListTicketsAdmin(void) {
     Ticket* heap[MAX_TICKETS_HEAP];
     int heapSize = 0;
@@ -292,6 +312,7 @@ int run_command(int argc, char* argv[]) {
     if (strcmp(cmd, "edit_ticket") == 0) return cmdEditTicket(argc, argv);
     if (strcmp(cmd, "delete_ticket") == 0) return cmdDeleteTicket(argc, argv);
     if (strcmp(cmd, "auto_assign_ticket") == 0) return cmdAutoAssignTicket(argc, argv);
+    if (strcmp(cmd, "undo_ticket") == 0) return cmdUndoTicket(argc, argv);
     if (strcmp(cmd, "list_tickets") == 0) return cmdListTickets(argc, argv);
     if (strcmp(cmd, "search_bst") == 0) return cmdSearchBST(argc, argv);
     if (strcmp(cmd, "list_tickets_admin") == 0) return cmdListTicketsAdmin();

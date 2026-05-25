@@ -159,3 +159,23 @@ int reassignTicket(int ticketId, int manualEid) {
     syncEngineers();
     return 0;
 }
+
+int hardDeleteTicket(int uid, int tid) {
+    TicketNode* node = searchTicketInBST(ticketBSTRoot, tid);
+    if (!node || node->data.uid != uid) return -1;
+
+    if (node->data.eid != -1) {
+        for (int i = 0; i < engineerCount; i++) {
+            if (engineers[i].id == node->data.eid) {
+                if (engineers[i].ticketsAssigned > 0) engineers[i].ticketsAssigned--;
+                break;
+            }
+        }
+    }
+
+    ticketBSTRoot = removeTicketFromBST(ticketBSTRoot, tid);
+    ticketCount--;
+    syncTickets();
+    syncEngineers();
+    return 0;
+}
